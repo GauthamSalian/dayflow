@@ -477,3 +477,41 @@ def delete_employee_account(user_id: str):
         raise e
     finally:
         conn.close()
+
+def update_user_role(user_id: str, role: str):
+    """
+    Updates a user's role (ADMIN or EMPLOYEE).
+    Updates public.users and syncs auth.users.raw_user_meta_data.
+    """
+    if role not in ('ADMIN', 'EMPLOYEE'):
+        raise ValueError("Role must be either ADMIN or EMPLOYEE")
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    
+    try:
+        # 1. Update public.users
+        cursor.execute("UPDATE public.users SET role = %s WHERE id = %s", (role, user_id))
+        
+        # 2. Sync with auth.users raw_user_meta_data JSONB field
+        role_json = f'"{role}"'
+        cursor.execute(
+            """
+            UPDATE auth.users
+            SET raw_user_meta_data = jsonb_set(
+                COALESCE(raw_user_meta_data, '{}'::jsonb), 
+                '{role}', 
+                %s::jsonb
+            )
+            WHERE id = %s;
+            """,
+            (role_json, user_id)
+        )
+        
+        conn.commit()
+        return {"success": True, "message": f"User role successfully updated to {role}."}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()

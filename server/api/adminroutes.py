@@ -150,3 +150,15 @@ def block_employee(user_id: str):
         return adminservices.delete_employee_account(user_id)
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class RoleUpdateRequest(BaseModel):
+    role: str
+
+@router.post("/employees/role/{user_id}")
+def update_role(user_id: str, req: RoleUpdateRequest):
+    try:
+        return adminservices.update_user_role(user_id, req.role)
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
