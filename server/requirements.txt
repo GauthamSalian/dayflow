@@ -2,3 +2,6 @@ fastapi
 supabase
 python-dotenv
 psycopg2-binary
+bcrypt
+uvicorn
+email-validator
