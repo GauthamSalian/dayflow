@@ -15,7 +15,7 @@ app = FastAPI(
 # CORS configuration to allow local frontend access
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # Adjust this to frontend host if needed for production
+    allow_origins=["*"],  # Restrict to frontend URL in production
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -24,16 +24,26 @@ app.add_middleware(
 # Import routes
 from api import adminroutes
 from api import authroutes
+from api import employeeroutes
 
 # Mount routes
 app.include_router(adminroutes.router, prefix="/api")
 app.include_router(authroutes.router, prefix="/api")
+app.include_router(employeeroutes.router, prefix="/api")
 
 @app.get("/")
 def read_root():
-    return {"message": "Welcome to the Dayflow HRM API!"}
+    return {
+        "message": "Welcome to the Dayflow HRM API!"
+    }
 
 if __name__ == "__main__":
     import uvicorn
+
     port = int(os.environ.get("PORT", 8000))
-    uvicorn.run("main:app", host="0.0.0.0", port=port, reload=True)
+    uvicorn.run(
+        "main:app",
+        host="0.0.0.0",
+        port=port,
+        reload=True
+    )
