@@ -1,7 +1,5 @@
 # Dayflow 🌌
 
-Dayflow is a premium, high-performance employee attendance and portfolio management system. Designed with a custom dark-mode glassmorphic theme, it features role-based portal routing for Managers and Employees to track clock-in histories, manage leave request pipelines, and update portfolios securely.
-
 ---
 
 ## 🚀 Key Features
@@ -158,6 +156,3 @@ dayflow/
 | **Change Password** | `/api/employee/change-password/{id}`| `POST` | Employee | Validates credentials and hashes new password into database |
 
 ---
-
-## 📝 License
-This project is proprietary. All rights reserved.
