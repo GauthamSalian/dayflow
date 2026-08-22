@@ -1,2 +1,17 @@
+# Python dependencies and environments
 server/.venv
 server/.env
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Frontend dependencies and builds
+client/node_modules/
+client/dist/
+client/.eslintcache

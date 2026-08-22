@@ -112,6 +112,19 @@ export default function EmployeeProfile() {
     contributionDays.push({ date: dateStr, status: dayStatus });
   }
 
+  // Split the 365 days into columns of weeks (7 days each)
+  const columns: typeof contributionDays[] = [];
+  for (let i = 0; i < contributionDays.length; i += 7) {
+    columns.push(contributionDays.slice(i, i + 7));
+  }
+  
+  const calendarQuarters = [
+    { label: 'Q1 (Jan - Mar)', cols: columns.slice(0, 13) },
+    { label: 'Q2 (Apr - Jun)', cols: columns.slice(13, 26) },
+    { label: 'Q3 (Jul - Sep)', cols: columns.slice(26, 39) },
+    { label: 'Q4 (Oct - Dec)', cols: columns.slice(39) }
+  ];
+
   // Duration Filter Calculation Stats
   const getStatsForDuration = (filter: '1w' | '1m' | '3m' | '1y') => {
     const today = new Date();
@@ -236,37 +249,56 @@ export default function EmployeeProfile() {
         {/* Right Side: Contribution Graph, Duration stats, Leaves */}
         <section className="lg:col-span-2 flex flex-col gap-6">
           
-          {/* GitHub Style Attendance Graph */}
+          {/* GitHub Style Attendance Graph (2x2 grid) */}
           <div className="glass-panel p-6">
-            <h3 className="text-lg font-bold mb-2 text-white flex items-center gap-2">
+            <h3 className="text-lg font-bold mb-2 text-white flex items-center gap-2 text-left">
               <Clock size={18} className="text-purple-400" />
-              Attendance logs ({currentYear})
+              Attendance Map ({currentYear})
             </h3>
-            <p className="text-xs text-gray-500 mb-6">Chronological attendance map (green = present, red = absent, grey = unlogged)</p>
+            <p className="text-xs text-gray-500 mb-6 text-left">Chronological attendance map (green = present, red = absent, grey = unlogged)</p>
             
-            <div className="flex justify-center overflow-x-auto py-2">
-              <div 
-                className="grid gap-1"
-                style={{ 
-                  gridAutoFlow: 'column', 
-                  gridTemplateRows: 'repeat(7, 1fr)',
-                  maxHeight: '110px'
-                }}
-              >
-                {contributionDays.map((day, idx) => {
-                  let bgColor = 'bg-white/5';
-                  if (day.status === 'PRESENT') bgColor = 'bg-emerald-500 shadow-sm shadow-emerald-500/25';
-                  if (day.status === 'ABSENT') bgColor = 'bg-red-500/20 border border-red-500/40';
-
-                  return (
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {calendarQuarters.map((row, rIdx) => (
+                <div key={rIdx} className="p-4 bg-[#0f1016]/40 border border-white/5 rounded-xl">
+                  <h4 className="text-xs font-bold text-purple-400 mb-3 text-left">{row.label}</h4>
+                  <div className="flex">
+                    {/* Weekday labels */}
+                    <div className="flex flex-col justify-between text-[9px] text-gray-500 pr-2 pt-5 pb-1 font-medium" style={{ height: '70px', minWidth: '24px' }}>
+                      <span></span>
+                      <span>Mon</span>
+                      <span></span>
+                      <span>Wed</span>
+                      <span></span>
+                      <span>Fri</span>
+                      <span></span>
+                    </div>
+                    {/* Grid */}
                     <div 
-                      key={idx}
-                      className={`w-3.5 h-3.5 rounded-sm transition-all duration-300 ${bgColor}`}
-                      title={`${day.date}: ${day.status}`}
-                    />
-                  );
-                })}
-              </div>
+                      className="grid gap-1"
+                      style={{ 
+                        gridAutoFlow: 'column', 
+                        gridTemplateRows: 'repeat(7, 1fr)',
+                        height: '70px'
+                      }}
+                    >
+                      {row.cols.flatMap(col => col).map((day, idx) => {
+                        let bgColor = 'bg-white/5';
+                        if (day.status === 'PRESENT') bgColor = 'bg-emerald-500 shadow-sm shadow-emerald-500/25';
+                        if (day.status === 'ABSENT') bgColor = 'bg-red-500/20 border border-red-500/40';
+
+                        return (
+                          <div 
+                            key={idx}
+                            className={`rounded-sm transition-all duration-300 ${bgColor}`}
+                            style={{ width: '9px', height: '9px' }}
+                            title={`${day.date}: ${day.status}`}
+                          />
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
 
             {/* Legend */}
