@@ -146,6 +146,12 @@ export const api = {
       apiFetch("/employee/leave/apply", {
         method: "POST",
         body: JSON.stringify(data)
+      }),
+      
+    changePassword: (user_id: string, data: { current_password: string; new_password: string }) =>
+      apiFetch(`/employee/change-password/${user_id}`, {
+        method: "POST",
+        body: JSON.stringify(data)
       })
   }
 };

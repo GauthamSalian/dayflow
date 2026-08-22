@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { 
   User, Calendar, DollarSign, LogOut, Clock, 
-  MapPin, Phone, Mail, Award, CheckCircle, Play, Square 
+  MapPin, Phone, Mail, Award, CheckCircle, Play, Square, Lock
 } from 'lucide-react';
 
 export default function Home() {
@@ -25,7 +25,51 @@ export default function Home() {
     reason: ''
   });
 
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [passwordLoading, setPasswordLoading] = useState(false);
+  const [passwordError, setPasswordError] = useState<string | null>(null);
+  const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
+
   const navigate = useNavigate();
+
+  const handleChangePassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setPasswordError(null);
+    setPasswordSuccess(null);
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError("New passwords do not match.");
+      return;
+    }
+
+    if (newPassword.length < 6) {
+      setPasswordError("Password must be at least 6 characters long.");
+      return;
+    }
+
+    setPasswordLoading(true);
+
+    try {
+      const res = await api.employee.changePassword(currentUser.id, {
+        current_password: currentPassword,
+        new_password: newPassword
+      });
+      if (res && res.success) {
+        setPasswordSuccess("Password updated successfully.");
+        setCurrentPassword('');
+        setNewPassword('');
+        setConfirmPassword('');
+      } else {
+        setPasswordError("Failed to update password.");
+      }
+    } catch (err: any) {
+      setPasswordError(err.message || "Failed to update password.");
+    } finally {
+      setPasswordLoading(false);
+    }
+  };
 
   const loadDashboardData = async (activeUser: any = user) => {
     if (!activeUser?.id) {
@@ -240,6 +284,79 @@ export default function Home() {
                 <span className="text-emerald-400 font-bold">₹47,000</span>
               </div>
             </div>
+          </div>
+
+          {/* Change Password Card */}
+          <div className="glass-panel p-6 mt-6">
+            <h3 className="text-lg font-bold mb-2 flex items-center gap-2 text-white text-left">
+              <Lock size={18} className="text-purple-400" />
+              Update Password
+            </h3>
+            <p className="text-xs text-gray-500 mb-6 text-left">Choose a strong, secure password.</p>
+
+            <form onSubmit={handleChangePassword} className="flex flex-col gap-4 text-left">
+              <div className="form-group mb-2">
+                <label className="form-label" htmlFor="curr-pass">Current Password *</label>
+                <input 
+                  id="curr-pass"
+                  type="password"
+                  className="form-input py-2 px-3 text-sm"
+                  placeholder="••••••••"
+                  value={currentPassword}
+                  onChange={e => setCurrentPassword(e.target.value)}
+                  required
+                  disabled={passwordLoading}
+                />
+              </div>
+
+              <div className="form-group mb-2">
+                <label className="form-label" htmlFor="new-pass">New Password *</label>
+                <input 
+                  id="new-pass"
+                  type="password"
+                  className="form-input py-2 px-3 text-sm"
+                  placeholder="••••••••"
+                  value={newPassword}
+                  onChange={e => setNewPassword(e.target.value)}
+                  required
+                  disabled={passwordLoading}
+                />
+              </div>
+
+              <div className="form-group mb-2">
+                <label className="form-label" htmlFor="conf-pass">Confirm New Password *</label>
+                <input 
+                  id="conf-pass"
+                  type="password"
+                  className="form-input py-2 px-3 text-sm"
+                  placeholder="••••••••"
+                  value={confirmPassword}
+                  onChange={e => setConfirmPassword(e.target.value)}
+                  required
+                  disabled={passwordLoading}
+                />
+              </div>
+
+              {passwordError && (
+                <div className="p-2 bg-red-500/10 border border-red-500/20 rounded-lg text-xs text-red-400">
+                  {passwordError}
+                </div>
+              )}
+
+              {passwordSuccess && (
+                <div className="p-2 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-xs text-emerald-400">
+                  {passwordSuccess}
+                </div>
+              )}
+
+              <button 
+                type="submit" 
+                className="btn btn-primary w-full py-2.5 text-sm flex items-center justify-center gap-1.5"
+                disabled={passwordLoading}
+              >
+                {passwordLoading ? 'Updating...' : 'Change Password'}
+              </button>
+            </form>
           </div>
         </section>
 
