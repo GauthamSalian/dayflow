@@ -6,9 +6,9 @@ load_dotenv()
 
 def get_db_connection():
     project_ref = "tdkuwgnoqqypeamevuob"
-    host = f"db.{project_ref}.supabase.co"
-    port = "5432"
-    user = "postgres"
+    host = "aws-0-ap-southeast-1.pooler.supabase.com"
+    port = "6543"
+    user = f"postgres.{project_ref}"
     dbname = "postgres"
     password = os.environ.get("SUPABASE_DB_PASSWORD", "Hackathon001")
     

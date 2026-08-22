@@ -101,6 +101,21 @@ export const api = {
       apiFetch(`/admin/employees/role/${user_id}`, {
         method: "POST",
         body: JSON.stringify({ role })
-      })
+      }),
+      
+    editEmployee: (user_id: string, data: { name: string; phone: string; address: string; salary: number }) =>
+      apiFetch(`/admin/employees/edit/${user_id}`, {
+        method: "POST",
+        body: JSON.stringify(data)
+      }),
+      
+    markAttendanceManual: (data: { user_id: string; date: string; status: "PRESENT" | "ABSENT" | "HALF_DAY" | "LEAVE" }) =>
+      apiFetch("/admin/attendance/manual", {
+        method: "POST",
+        body: JSON.stringify(data)
+      }),
+      
+    getEmployeeProfileDetail: (user_id: string) =>
+      apiFetch(`/admin/employees/profile/${user_id}`)
   }
 };

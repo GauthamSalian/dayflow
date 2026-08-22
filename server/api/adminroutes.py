@@ -162,3 +162,49 @@ def update_role(user_id: str, req: RoleUpdateRequest):
         raise HTTPException(status_code=400, detail=str(ve))
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+class EmployeeEditRequest(BaseModel):
+    name: str
+    phone: str
+    address: str
+    salary: float
+
+class ManualAttendanceRequest(BaseModel):
+    user_id: str
+    date: str
+    status: str
+
+@router.post("/employees/edit/{user_id}")
+def edit_employee(user_id: str, req: EmployeeEditRequest):
+    try:
+        return adminservices.edit_employee_details(
+            user_id=user_id,
+            name=req.name,
+            phone=req.phone,
+            address=req.address,
+            salary=req.salary
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/attendance/manual")
+def set_attendance_manual(req: ManualAttendanceRequest):
+    try:
+        return adminservices.mark_attendance_manual(
+            user_id=req.user_id,
+            date_str=req.date,
+            status=req.status
+        )
+    except ValueError as ve:
+        raise HTTPException(status_code=400, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/employees/profile/{user_id}")
+def get_employee_profile(user_id: str):
+    try:
+        return adminservices.get_employee_profile_detail(user_id)
+    except ValueError as ve:
+        raise HTTPException(status_code=404, detail=str(ve))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))

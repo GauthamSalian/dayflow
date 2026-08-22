@@ -4,6 +4,8 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
 import Home from './pages/Home';
+import EmployeesList from './pages/EmployeesList';
+import EmployeeProfile from './pages/EmployeeProfile';
 
 // Simple Route Protection wrapper
 const ProtectedRoute = ({ children, allowedRole }: { children: React.ReactNode, allowedRole: string }) => {
@@ -36,6 +38,22 @@ function App() {
           element={
             <ProtectedRoute allowedRole="ADMIN">
               <Dashboard />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/employees" 
+          element={
+            <ProtectedRoute allowedRole="ADMIN">
+              <EmployeesList />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="/employees/:user_id" 
+          element={
+            <ProtectedRoute allowedRole="ADMIN">
+              <EmployeeProfile />
             </ProtectedRoute>
           } 
         />

@@ -2,18 +2,16 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { api } from '../utils/api';
 import { 
-  Users, UserPlus, Calendar, DollarSign, LogOut, Loader2, 
-  Check, X, CheckCircle, Ban
+  Users, Calendar, DollarSign, LogOut, Loader2, 
+  CheckCircle, UserPlus
 } from 'lucide-react';
 
 export default function Dashboard() {
-  const [activeTab, setActiveTab] = useState<'employees' | 'add-employee' | 'leaves' | 'payroll'>('employees');
-  const [employees, setEmployees] = useState<any[]>([]);
+  const [activePanel, setActivePanel] = useState<'none' | 'leaves' | 'payroll' | 'add-employee'>('none');
   const [payrolls, setPayrolls] = useState<any[]>([]);
   const [leavesData, setLeavesData] = useState<{ decision_taken: any[], to_be_approved: any[] }>({ decision_taken: [], to_be_approved: [] });
   
   // Loading states
-  const [loadingEmployees, setLoadingEmployees] = useState(false);
   const [loadingLeaves, setLoadingLeaves] = useState(false);
   const [loadingPayroll, setLoadingPayroll] = useState(false);
   
@@ -43,23 +41,10 @@ export default function Dashboard() {
   const adminUser = JSON.parse(localStorage.getItem('user') || '{}');
 
   useEffect(() => {
-    // Redirect if not logged in or not admin
     if (!adminUser.role || adminUser.role !== 'ADMIN') {
       navigate('/login');
     }
   }, [navigate]);
-
-  const fetchEmployees = async () => {
-    setLoadingEmployees(true);
-    try {
-      const data = await api.admin.getEmployees();
-      setEmployees(data || []);
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoadingEmployees(false);
-    }
-  };
 
   const fetchLeaves = async () => {
     setLoadingLeaves(true);
@@ -85,12 +70,10 @@ export default function Dashboard() {
     }
   };
 
-  // Fetch data on tab change
   useEffect(() => {
-    if (activeTab === 'employees') fetchEmployees();
-    if (activeTab === 'leaves') fetchLeaves();
-    if (activeTab === 'payroll') fetchPayroll();
-  }, [activeTab]);
+    if (activePanel === 'leaves') fetchLeaves();
+    if (activePanel === 'payroll') fetchPayroll();
+  }, [activePanel]);
 
   const handleCreateEmployee = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -108,7 +91,6 @@ export default function Dashboard() {
         address: empAddress
       });
       setCreatedCreds(creds);
-      // Reset form
       setEmpName('');
       setEmpEmail('');
       setEmpPhone('');
@@ -119,27 +101,6 @@ export default function Dashboard() {
       setCreateError(err.message || 'Failed to create employee.');
     } finally {
       setCreatingEmployee(false);
-    }
-  };
-
-  const handleBlockEmployee = async (userId: string) => {
-    if (!window.confirm("Are you sure you want to block this employee? This will prevent them from logging in.")) return;
-    try {
-      await api.admin.blockEmployee(userId);
-      fetchEmployees();
-    } catch (err) {
-      alert("Failed to block user");
-    }
-  };
-
-  const handleToggleAdminRole = async (userId: string, currentRole: string) => {
-    const targetRole = currentRole === 'ADMIN' ? 'EMPLOYEE' : 'ADMIN';
-    if (!window.confirm(`Are you sure you want to change role to ${targetRole}?`)) return;
-    try {
-      await api.admin.updateRole(userId, targetRole);
-      fetchEmployees();
-    } catch (err) {
-      alert("Failed to update role");
     }
   };
 
@@ -192,152 +153,352 @@ export default function Dashboard() {
   };
 
   return (
-    <div className="flex min-h-screen bg-[#0a0b10]">
+    <div className="min-h-screen bg-[#0a0b10] flex flex-col p-6" style={{ background: 'radial-gradient(circle at top right, rgba(139, 92, 246, 0.04), transparent 50%)' }}>
       
-      {/* Sidebar Navigation */}
-      <aside className="w-64 glass-panel m-4 mr-0 p-6 flex flex-col justify-between" style={{ borderRadius: '16px' }}>
-        <div>
-          {/* Logo */}
-          <div className="flex items-center gap-2 mb-8">
-            <div className="w-8 h-8 rounded-lg bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-bold text-white shadow-md shadow-purple-900/40">
-              D
-            </div>
-            <span className="text-lg font-bold tracking-tight text-white glow-text">Dayflow Admin</span>
+      {/* Header Panel */}
+      <header className="glass-panel w-full p-6 flex items-center justify-between mb-8" style={{ borderRadius: '16px' }}>
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-tr from-purple-600 to-indigo-600 flex items-center justify-center font-bold text-white text-xl shadow-md">
+            D
           </div>
-
-          {/* Navigation Links */}
-          <nav className="flex flex-col gap-1.5">
-            <button 
-              onClick={() => setActiveTab('employees')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${activeTab === 'employees' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <Users size={18} />
-              Employees
-            </button>
-            
-            <button 
-              onClick={() => setActiveTab('add-employee')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${activeTab === 'add-employee' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <UserPlus size={18} />
-              Add Employee
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('leaves')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${activeTab === 'leaves' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <Calendar size={18} />
-              Leave Requests
-            </button>
-
-            <button 
-              onClick={() => setActiveTab('payroll')}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-all ${activeTab === 'payroll' ? 'bg-purple-600 text-white shadow-lg shadow-purple-900/20' : 'text-gray-400 hover:bg-white/5 hover:text-white'}`}
-            >
-              <DollarSign size={18} />
-              Payroll Control
-            </button>
-          </nav>
+          <div>
+            <h1 className="text-xl font-bold text-white tracking-tight glow-text">Dayflow Workplace</h1>
+            <p className="text-xs text-gray-400">Admin Control Center</p>
+          </div>
         </div>
+        
+        <div className="text-right text-sm text-gray-400">
+          <p className="font-bold text-white">{adminUser.name}</p>
+          <p className="text-xs text-purple-400">System Administrator</p>
+        </div>
+      </header>
 
-        {/* User Info / Logout */}
-        <div className="pt-6 border-t border-purple-900/15">
-          <div className="text-left mb-4 px-2">
-            <p className="text-xs text-gray-500 font-semibold uppercase tracking-wider">Logged In As</p>
-            <p className="text-sm font-bold text-white truncate">{adminUser.name || 'Admin User'}</p>
-            <p className="text-xs text-gray-400 truncate">{adminUser.email}</p>
-          </div>
+      {/* Main Overhaul Landing Dashboard */}
+      <div className="max-w-6xl w-full mx-auto flex-1 flex flex-col gap-8">
+        
+        {/* 4 Control Buttons Landing Grid */}
+        <section className="grid grid-cols-2 md:grid-cols-4 gap-6">
+          
+          {/* Button 1: Display Employee List */}
+          <button 
+            onClick={() => navigate('/employees')}
+            className="glass-card p-6 flex flex-col items-center justify-center text-center gap-4 border border-purple-500/10 hover:border-purple-500/30 glow-box group"
+            style={{ borderRadius: '16px' }}
+          >
+            <div className="w-14 h-14 rounded-full bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:bg-purple-600 group-hover:text-white transition-all duration-300">
+              <Users size={28} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-white">Employee List</h3>
+              <p className="text-xs text-gray-500 mt-1">View directory & attendance</p>
+            </div>
+          </button>
+
+          {/* Button 2: Display Leave Requests */}
+          <button 
+            onClick={() => setActivePanel(activePanel === 'leaves' ? 'none' : 'leaves')}
+            className={`glass-card p-6 flex flex-col items-center justify-center text-center gap-4 border hover:border-purple-500/30 glow-box group ${activePanel === 'leaves' ? 'border-purple-500 bg-purple-600/10 shadow-lg shadow-purple-900/10' : 'border-purple-500/10'}`}
+            style={{ borderRadius: '16px' }}
+          >
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${activePanel === 'leaves' ? 'bg-purple-600 text-white' : 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-600 group-hover:text-white'}`}>
+              <Calendar size={28} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-white">Leave Requests</h3>
+              <p className="text-xs text-gray-500 mt-1">Approve pending applications</p>
+            </div>
+          </button>
+
+          {/* Button 3: Display Employee Records (Payroll) */}
+          <button 
+            onClick={() => setActivePanel(activePanel === 'payroll' ? 'none' : 'payroll')}
+            className={`glass-card p-6 flex flex-col items-center justify-center text-center gap-4 border hover:border-purple-500/30 glow-box group ${activePanel === 'payroll' ? 'border-purple-500 bg-purple-600/10 shadow-lg shadow-purple-900/10' : 'border-purple-500/10'}`}
+            style={{ borderRadius: '16px' }}
+          >
+            <div className={`w-14 h-14 rounded-full flex items-center justify-center transition-all duration-300 ${activePanel === 'payroll' ? 'bg-purple-600 text-white' : 'bg-purple-500/10 text-purple-400 group-hover:bg-purple-600 group-hover:text-white'}`}>
+              <DollarSign size={28} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-white">Employee Records</h3>
+              <p className="text-xs text-gray-500 mt-1">Review payroll & salaries</p>
+            </div>
+          </button>
+
+          {/* Button 4: Sign Out / Logout */}
           <button 
             onClick={handleLogout}
-            className="flex items-center gap-3 w-full px-4 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-all"
+            className="glass-card p-6 flex flex-col items-center justify-center text-center gap-4 border border-red-500/10 hover:border-red-500/30 hover:bg-red-500/5 group"
+            style={{ borderRadius: '16px' }}
           >
-            <LogOut size={18} />
-            Sign Out
+            <div className="w-14 h-14 rounded-full bg-red-500/10 flex items-center justify-center text-red-400 group-hover:bg-red-500 group-hover:text-white transition-all duration-300">
+              <LogOut size={28} />
+            </div>
+            <div>
+              <h3 className="font-bold text-lg text-white">Sign Out</h3>
+              <p className="text-xs text-gray-500 mt-1">Clear session & cookies</p>
+            </div>
           </button>
-        </div>
-      </aside>
 
-      {/* Main Content Area */}
-      <main className="flex-1 p-8 overflow-y-auto">
-        
-        {/* TAB: Employees */}
-        {activeTab === 'employees' && (
-          <div>
-            <div className="flex items-center justify-between mb-8">
-              <div>
-                <h1 className="text-3xl font-extrabold tracking-tight">Active Directory</h1>
-                <p className="text-gray-400 text-sm mt-1">Manage employees and monitor today's attendance.</p>
-              </div>
+        </section>
+
+        {/* Sub-action: Add Employee Quick Trigger (keeps layout complete) */}
+        {activePanel === 'none' && (
+          <section className="flex justify-end">
+            <button 
+              onClick={() => setActivePanel('add-employee')}
+              className="btn btn-primary flex items-center gap-2 py-2 px-5 text-sm"
+            >
+              <UserPlus size={16} />
+              Register New Employee
+            </button>
+          </section>
+        )}
+
+        {/* PANEL: Leave Requests */}
+        {activePanel === 'leaves' && (
+          <div className="glass-panel p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Leave Requests (Last 3 Days)</h2>
+              <button onClick={() => setActivePanel('none')} className="btn btn-secondary py-1 px-3 text-xs">Close</button>
             </div>
 
-            {loadingEmployees ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="animate-spin text-purple-500" size={36} />
+            {loadingLeaves ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="animate-spin text-purple-500" />
               </div>
             ) : (
-              <div className="glass-panel p-6">
-                <div className="table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Employee ID</th>
-                        <th>Name</th>
-                        <th>Email</th>
-                        <th>Phone</th>
-                        <th>Today's Status</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {employees.map(emp => (
-                        <tr key={emp.id}>
-                          <td className="font-mono text-purple-400 text-sm">{emp.employee_id}</td>
-                          <td className="font-semibold text-white">{emp.name}</td>
-                          <td>{emp.email}</td>
-                          <td>{emp.phone}</td>
-                          <td>
-                            <span className={`badge ${emp.is_present_today ? 'badge-present' : 'badge-absent'}`}>
-                              {emp.is_present_today ? 'PRESENT' : 'ABSENT'}
-                            </span>
-                          </td>
-                          <td>
-                            <div className="flex gap-2">
-                              <button 
-                                onClick={() => handleToggleAdminRole(emp.id, emp.role)} 
-                                className="btn btn-secondary py-1 px-2.5 text-xs flex items-center gap-1"
-                              >
-                                Toggle Admin
-                              </button>
-                              <button 
-                                onClick={() => handleBlockEmployee(emp.id)} 
-                                className="btn btn-danger py-1 px-2.5 text-xs flex items-center gap-1"
-                              >
-                                <Ban size={12} />
-                                Block
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                      {employees.length === 0 && (
+              <div className="flex flex-col gap-6">
+                
+                {/* To Be Approved Table */}
+                <div>
+                  <h3 className="text-sm font-bold text-yellow-500 mb-3 uppercase tracking-wider">To Be Approved</h3>
+                  <div className="table-container">
+                    <table className="custom-table">
+                      <thead>
                         <tr>
-                          <td colSpan={6} className="text-center py-8 text-gray-500">No active employees found.</td>
+                          <th>Employee</th>
+                          <th>Type</th>
+                          <th>Duration</th>
+                          <th>Reason</th>
+                          <th>Comment</th>
+                          <th>Actions</th>
                         </tr>
-                      )}
-                    </tbody>
-                  </table>
+                      </thead>
+                      <tbody>
+                        {leavesData.to_be_approved.map(leave => (
+                          <tr key={leave.id}>
+                            <td className="font-semibold text-white">{leave.employee_name}</td>
+                            <td><span className="badge badge-warning">{leave.leave_type}</span></td>
+                            <td className="text-sm">
+                              {leave.start_date} to {leave.end_date} <br />
+                              <span className="text-purple-400 font-medium">({leave.duration_days} days)</span>
+                            </td>
+                            <td className="max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
+                            <td>
+                              <input 
+                                type="text"
+                                className="form-input py-1.5 px-3 text-xs"
+                                placeholder="Decision reason..."
+                                value={leaveComment[leave.id] || ''}
+                                onChange={e => setLeaveComment(prev => ({ ...prev, [leave.id]: e.target.value }))}
+                              />
+                            </td>
+                            <td>
+                              <div className="flex gap-1.5">
+                                <button 
+                                  onClick={() => handleLeaveAction(leave.id, 'APPROVED')}
+                                  disabled={actingOnLeave[leave.id]}
+                                  className="btn btn-primary py-1 px-2.5 text-xs bg-emerald-600 hover:bg-emerald-500 shadow-none flex items-center gap-1"
+                                >
+                                  Approve
+                                </button>
+                                <button 
+                                  onClick={() => handleLeaveAction(leave.id, 'REJECTED')}
+                                  disabled={actingOnLeave[leave.id]}
+                                  className="btn btn-danger py-1 px-2.5 text-xs"
+                                >
+                                  Reject
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                        {leavesData.to_be_approved.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="text-center py-6 text-gray-500">No pending leave requests.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
                 </div>
+
+                {/* History Table */}
+                <div>
+                  <h3 className="text-sm font-bold text-gray-400 mb-3 uppercase tracking-wider">Decision History</h3>
+                  <div className="table-container">
+                    <table className="custom-table">
+                      <thead>
+                        <tr>
+                          <th>Employee</th>
+                          <th>Type</th>
+                          <th>Duration</th>
+                          <th>Reason</th>
+                          <th>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {leavesData.decision_taken.map(leave => (
+                          <tr key={leave.id}>
+                            <td className="font-semibold text-white">{leave.employee_name}</td>
+                            <td><span className="badge badge-warning">{leave.leave_type}</span></td>
+                            <td className="text-sm">
+                              {leave.start_date} to {leave.end_date} <br />
+                              <span className="text-purple-400 font-medium">({leave.duration_days} days)</span>
+                            </td>
+                            <td className="max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
+                            <td>
+                              <span className={`badge ${leave.status === 'APPROVED' ? 'badge-present' : 'badge-absent'}`}>
+                                {leave.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                        {leavesData.decision_taken.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="text-center py-6 text-gray-500">No leave decision history.</td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+
               </div>
             )}
           </div>
         )}
 
-        {/* TAB: Add Employee */}
-        {activeTab === 'add-employee' && (
-          <div className="max-w-2xl">
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Register Employee</h1>
-            <p className="text-gray-400 text-sm mb-8">Add a new record. Credentials will be generated automatically.</p>
+        {/* PANEL: Employee Records (Payroll) */}
+        {activePanel === 'payroll' && (
+          <div className="glass-panel p-6">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-xl font-bold text-white">Employee Payroll Records</h2>
+              <button onClick={() => setActivePanel('none')} className="btn btn-secondary py-1 px-3 text-xs">Close</button>
+            </div>
+
+            {loadingPayroll ? (
+              <div className="flex justify-center py-10">
+                <Loader2 className="animate-spin text-purple-500" />
+              </div>
+            ) : (
+              <div className="table-container">
+                <table className="custom-table">
+                  <thead>
+                    <tr>
+                      <th>Employee ID</th>
+                      <th>Name</th>
+                      <th>Basic Salary</th>
+                      <th>Allowances</th>
+                      <th>Deductions</th>
+                      <th>Net Salary</th>
+                      <th>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {payrolls.map(pay => {
+                      const isEditing = editingPayrollUserId === pay.user_id;
+                      return (
+                        <tr key={pay.user_id}>
+                          <td className="font-mono text-purple-400 text-sm">{pay.employee_id}</td>
+                          <td className="font-semibold text-white">{pay.name}</td>
+                          <td>
+                            {isEditing ? (
+                              <input 
+                                type="number" 
+                                className="form-input py-1 px-2 text-xs max-w-[100px]" 
+                                value={editBasic}
+                                onChange={e => setEditBasic(e.target.value)}
+                              />
+                            ) : (
+                              `₹${pay.basic_salary.toLocaleString()}`
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input 
+                                type="number" 
+                                className="form-input py-1 px-2 text-xs max-w-[100px]" 
+                                value={editAllowances}
+                                onChange={e => setEditAllowances(e.target.value)}
+                              />
+                            ) : (
+                              `₹${pay.allowances.toLocaleString()}`
+                            )}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <input 
+                                type="number" 
+                                className="form-input py-1 px-2 text-xs max-w-[100px]" 
+                                value={editDeductions}
+                                onChange={e => setEditDeductions(e.target.value)}
+                              />
+                            ) : (
+                              `₹${pay.deductions.toLocaleString()}`
+                            )}
+                          </td>
+                          <td className="font-bold text-emerald-400">
+                            {isEditing ? 'Calculated' : `₹${pay.net_salary.toLocaleString()}`}
+                          </td>
+                          <td>
+                            {isEditing ? (
+                              <div className="flex gap-1.5">
+                                <button 
+                                  onClick={() => handleUpdatePayroll(pay.user_id)}
+                                  disabled={updatingPayroll}
+                                  className="btn btn-primary py-1.5 px-3 text-xs bg-emerald-600 hover:bg-emerald-500 shadow-none flex items-center gap-1"
+                                >
+                                  Save
+                                </button>
+                                <button 
+                                  onClick={() => setEditingPayrollUserId(null)}
+                                  className="btn btn-secondary py-1.5 px-3 text-xs"
+                                >
+                                  Cancel
+                                </button>
+                              </div>
+                            ) : (
+                              <button 
+                                onClick={() => startEditPayroll(pay)}
+                                className="btn btn-secondary py-1 px-2.5 text-xs"
+                              >
+                                Edit Structure
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                    {payrolls.length === 0 && (
+                      <tr>
+                        <td colSpan={7} className="text-center py-6 text-gray-500">No payroll structures initialized.</td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* PANEL: Register Employee */}
+        {activePanel === 'add-employee' && (
+          <div className="max-w-2xl mx-auto w-full">
+            <div className="flex items-center justify-between mb-6">
+              <h2 className="text-2xl font-bold text-white">Register Employee Record</h2>
+              <button onClick={() => { setActivePanel('none'); setCreatedCreds(null); }} className="btn btn-secondary py-1 px-3 text-xs">Close</button>
+            </div>
 
             {createdCreds && (
               <div className="glass-panel p-6 border-emerald-500/20 bg-emerald-500/5 mb-8 text-left pulse-border">
@@ -345,7 +506,7 @@ export default function Dashboard() {
                   <CheckCircle className="text-emerald-500 shrink-0" size={24} />
                   <div>
                     <h3 className="text-lg font-bold text-white">Employee Registered Successfully</h3>
-                    <p className="text-sm text-gray-400">Share these login credentials with the employee. Write them down as they won't show again.</p>
+                    <p className="text-sm text-gray-400">Share these generated login credentials with the employee.</p>
                   </div>
                 </div>
                 <div className="bg-[#0f1016] border border-white/5 rounded-lg p-4 font-mono text-sm flex flex-col gap-2">
@@ -359,8 +520,8 @@ export default function Dashboard() {
               </div>
             )}
 
-            <div className="glass-panel p-8">
-              <form onSubmit={handleCreateEmployee} className="flex flex-col gap-5">
+            <div className="glass-panel p-6">
+              <form onSubmit={handleCreateEmployee} className="flex flex-col gap-4 text-left">
                 <div className="grid-2">
                   <div className="form-group">
                     <label className="form-label" htmlFor="emp-name">Employee Full Name *</label>
@@ -431,7 +592,7 @@ export default function Dashboard() {
                   <label className="form-label" htmlFor="emp-address">Residential Address *</label>
                   <textarea 
                     id="emp-address" 
-                    className="form-input min-h-[80px]" 
+                    className="form-input min-h-[60px]" 
                     placeholder="Apartment, Street, City" 
                     value={empAddress} 
                     onChange={e => setEmpAddress(e.target.value)} 
@@ -464,265 +625,7 @@ export default function Dashboard() {
           </div>
         )}
 
-        {/* TAB: Leave Requests */}
-        {activeTab === 'leaves' && (
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Leave Administration</h1>
-            <p className="text-gray-400 text-sm mb-8">Manage incoming leave requests generated over the last 3 days.</p>
-
-            {loadingLeaves ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="animate-spin text-purple-500" size={36} />
-              </div>
-            ) : (
-              <div className="flex flex-col gap-8">
-                
-                {/* Section: Pending Leaves */}
-                <div className="glass-panel p-6">
-                  <h2 className="text-xl font-bold mb-4 flex items-center gap-2">
-                    <span className="w-2.5 h-2.5 rounded-full bg-yellow-500 animate-pulse"></span>
-                    To Be Approved
-                  </h2>
-                  <div className="table-container">
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>Employee</th>
-                          <th>Type</th>
-                          <th>Duration</th>
-                          <th>Reason</th>
-                          <th>Admin comment</th>
-                          <th>Actions</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leavesData.to_be_approved.map(leave => (
-                          <tr key={leave.id}>
-                            <td className="font-semibold text-white">{leave.employee_name}</td>
-                            <td><span className="badge badge-warning">{leave.leave_type}</span></td>
-                            <td className="text-sm">
-                              {leave.start_date} to {leave.end_date} <br />
-                              <span className="text-purple-400 font-medium">({leave.duration_days} days)</span>
-                            </td>
-                            <td className="max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
-                            <td>
-                              <input 
-                                type="text"
-                                className="form-input py-1.5 px-3 text-xs"
-                                placeholder="Decision reason..."
-                                value={leaveComment[leave.id] || ''}
-                                onChange={e => setLeaveComment(prev => ({ ...prev, [leave.id]: e.target.value }))}
-                              />
-                            </td>
-                            <td>
-                              <div className="flex gap-1.5">
-                                <button 
-                                  onClick={() => handleLeaveAction(leave.id, 'APPROVED')}
-                                  disabled={actingOnLeave[leave.id]}
-                                  className="btn btn-primary py-1.5 px-3 text-xs flex items-center gap-1 bg-emerald-600 hover:bg-emerald-500 shadow-none"
-                                >
-                                  {actingOnLeave[leave.id] ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                                  Approve
-                                </button>
-                                <button 
-                                  onClick={() => handleLeaveAction(leave.id, 'REJECTED')}
-                                  disabled={actingOnLeave[leave.id]}
-                                  className="btn btn-danger py-1.5 px-3 text-xs flex items-center gap-1"
-                                >
-                                  {actingOnLeave[leave.id] ? <Loader2 size={12} className="animate-spin" /> : <X size={12} />}
-                                  Reject
-                                </button>
-                              </div>
-                            </td>
-                          </tr>
-                        ))}
-                        {leavesData.to_be_approved.length === 0 && (
-                          <tr>
-                            <td colSpan={6} className="text-center py-8 text-gray-500">No pending leave requests.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-                {/* Section: Actioned Leaves */}
-                <div className="glass-panel p-6">
-                  <h2 className="text-xl font-bold mb-4 text-gray-400">Decision History</h2>
-                  <div className="table-container">
-                    <table className="custom-table">
-                      <thead>
-                        <tr>
-                          <th>Employee</th>
-                          <th>Type</th>
-                          <th>Duration</th>
-                          <th>Reason</th>
-                          <th>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {leavesData.decision_taken.map(leave => (
-                          <tr key={leave.id}>
-                            <td className="font-semibold text-white">{leave.employee_name}</td>
-                            <td><span className="badge badge-warning">{leave.leave_type}</span></td>
-                            <td className="text-sm">
-                              {leave.start_date} to {leave.end_date} <br />
-                              <span className="text-purple-400 font-medium">({leave.duration_days} days)</span>
-                            </td>
-                            <td className="max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
-                            <td>
-                              <span className={`badge ${leave.status === 'APPROVED' ? 'badge-present' : 'badge-absent'}`}>
-                                {leave.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                        {leavesData.decision_taken.length === 0 && (
-                          <tr>
-                            <td colSpan={5} className="text-center py-8 text-gray-500">No leave decision history.</td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* TAB: Payroll Control */}
-        {activeTab === 'payroll' && (
-          <div>
-            <h1 className="text-3xl font-extrabold tracking-tight mb-2">Payroll Administration</h1>
-            <p className="text-gray-400 text-sm mb-8">Review employee salary structures and customize allowances and deductions.</p>
-
-            {loadingPayroll ? (
-              <div className="flex items-center justify-center py-20">
-                <Loader2 className="animate-spin text-purple-500" size={36} />
-              </div>
-            ) : (
-              <div className="glass-panel p-6">
-                <div className="table-container">
-                  <table className="custom-table">
-                    <thead>
-                      <tr>
-                        <th>Employee ID</th>
-                        <th>Name</th>
-                        <th>Basic (INR)</th>
-                        <th>Allowances</th>
-                        <th>Deductions</th>
-                        <th>Net Salary</th>
-                        <th>Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {payrolls.map(pay => {
-                        const isEditing = editingPayrollUserId === pay.user_id;
-                        return (
-                          <tr key={pay.user_id}>
-                            <td className="font-mono text-purple-400 text-sm">{pay.employee_id}</td>
-                            <td className="font-semibold text-white">{pay.name}</td>
-                            
-                            {/* Basic Salary */}
-                            <td>
-                              {isEditing ? (
-                                <input 
-                                  type="number"
-                                  className="form-input py-1 px-2 text-sm max-w-[100px]"
-                                  value={editBasic}
-                                  onChange={e => setEditBasic(e.target.value)}
-                                />
-                              ) : (
-                                `₹${pay.basic_salary.toLocaleString()}`
-                              )}
-                            </td>
-
-                            {/* Allowances */}
-                            <td>
-                              {isEditing ? (
-                                <input 
-                                  type="number"
-                                  className="form-input py-1 px-2 text-sm max-w-[100px]"
-                                  value={editAllowances}
-                                  onChange={e => setEditAllowances(e.target.value)}
-                                />
-                              ) : (
-                                `₹${pay.allowances.toLocaleString()}`
-                              )}
-                            </td>
-
-                            {/* Deductions */}
-                            <td>
-                              {isEditing ? (
-                                <input 
-                                  type="number"
-                                  className="form-input py-1 px-2 text-sm max-w-[100px]"
-                                  value={editDeductions}
-                                  onChange={e => setEditDeductions(e.target.value)}
-                                />
-                              ) : (
-                                `₹${pay.deductions.toLocaleString()}`
-                              )}
-                            </td>
-
-                            {/* Net Salary */}
-                            <td className="font-bold text-emerald-400">
-                              {isEditing ? (
-                                <span className="text-gray-500 text-xs font-normal">Calculated upon save</span>
-                              ) : (
-                                `₹${pay.net_salary.toLocaleString()}`
-                              )}
-                            </td>
-
-                            {/* Actions */}
-                            <td>
-                              {isEditing ? (
-                                <div className="flex gap-1.5">
-                                  <button 
-                                    onClick={() => handleUpdatePayroll(pay.user_id)}
-                                    disabled={updatingPayroll}
-                                    className="btn btn-primary py-1.5 px-3 text-xs bg-emerald-600 hover:bg-emerald-500 shadow-none flex items-center gap-1"
-                                  >
-                                    {updatingPayroll ? <Loader2 size={12} className="animate-spin" /> : <Check size={12} />}
-                                    Save
-                                  </button>
-                                  <button 
-                                    onClick={() => setEditingPayrollUserId(null)}
-                                    disabled={updatingPayroll}
-                                    className="btn btn-secondary py-1.5 px-3 text-xs"
-                                  >
-                                    Cancel
-                                  </button>
-                                </div>
-                              ) : (
-                                <button 
-                                  onClick={() => startEditPayroll(pay)}
-                                  className="btn btn-secondary py-1 px-3 text-xs"
-                                >
-                                  Edit Structure
-                                </button>
-                              )}
-                            </td>
-
-                          </tr>
-                        );
-                      })}
-                      {payrolls.length === 0 && (
-                        <tr>
-                          <td colSpan={7} className="text-center py-8 text-gray-500">No payroll structures initialized.</td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-      </main>
+      </div>
 
     </div>
   );

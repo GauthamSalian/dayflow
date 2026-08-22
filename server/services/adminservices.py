@@ -515,3 +515,204 @@ def update_user_role(user_id: str, role: str):
         raise e
     finally:
         conn.close()
+
+def edit_employee_details(user_id: str, name: str, phone: str, address: str, salary: float):
+    """
+    Updates profile details (name, phone, address) and payroll structure.
+    Also syncs with raw_user_meta_data in auth.users.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Update public.users
+        cursor.execute(
+            """
+            UPDATE public.users
+            SET name = %s, phone = %s, address = %s
+            WHERE id = %s;
+            """,
+            (name, phone, address, user_id)
+        )
+        
+        # 2. Update auth.users metadata JSONB
+        meta_update = {
+            "name": name,
+            "phone": phone,
+            "address": address
+        }
+        cursor.execute(
+            """
+            UPDATE auth.users
+            SET raw_user_meta_data = COALESCE(raw_user_meta_data, '{}'::jsonb) || %s::jsonb
+            WHERE id = %s;
+            """,
+            (json.dumps(meta_update), user_id)
+        )
+        
+        # 3. Fetch current allowances/deductions to preserve them
+        cursor.execute("SELECT allowances, deductions FROM public.payroll WHERE user_id = %s", (user_id,))
+        row = cursor.fetchone()
+        allowances = 0.0
+        deductions = 0.0
+        if row:
+            allowances = float(row[0])
+            deductions = float(row[1])
+            
+        net_salary = salary + allowances - deductions
+        
+        # 4. Update public.payroll
+        cursor.execute(
+            """
+            INSERT INTO public.payroll (user_id, basic_salary, allowances, deductions, net_salary, updated_at)
+            VALUES (%s, %s, %s, %s, %s, NOW())
+            ON CONFLICT (user_id) DO UPDATE SET
+                basic_salary = EXCLUDED.basic_salary,
+                net_salary = EXCLUDED.net_salary,
+                updated_at = NOW();
+            """,
+            (user_id, salary, allowances, deductions, net_salary)
+        )
+        
+        conn.commit()
+        return {"success": True, "message": "Employee details updated successfully."}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def mark_attendance_manual(user_id: str, date_str: str, status: str):
+    """
+    Manually overrides an employee's attendance for a given date.
+    """
+    if status not in ('PRESENT', 'ABSENT', 'HALF_DAY', 'LEAVE'):
+        raise ValueError("Status must be one of: PRESENT, ABSENT, HALF_DAY, LEAVE")
+        
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        if status in ('PRESENT', 'HALF_DAY'):
+            check_in = f"{date_str} 09:00:00"
+            check_out = f"{date_str} 17:00:00" if status == 'PRESENT' else f"{date_str} 13:00:00"
+        else:
+            check_in = None
+            check_out = None
+            
+        cursor.execute(
+            """
+            INSERT INTO public.attendance (user_id, date, check_in, check_out, status)
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT (user_id, date) DO UPDATE SET
+                check_in = EXCLUDED.check_in,
+                check_out = EXCLUDED.check_out,
+                status = EXCLUDED.status;
+            """,
+            (user_id, date_str, check_in, check_out, status)
+        )
+        conn.commit()
+        return {"success": True, "message": "Attendance marked successfully."}
+    except Exception as e:
+        conn.rollback()
+        raise e
+    finally:
+        conn.close()
+
+def get_employee_profile_detail(user_id: str):
+    """
+    Fetches aggregate profile, payroll, attendance, and leave history for the profile slug view.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    try:
+        # 1. Profile Details
+        cursor.execute(
+            """
+            SELECT id, employee_id, name, email, phone, address, role, date_of_joining, is_blocked
+            FROM public.users WHERE id = %s;
+            """,
+            (user_id,)
+        )
+        u_row = cursor.fetchone()
+        if not u_row:
+            raise ValueError(f"User with ID {user_id} not found.")
+            
+        user_profile = {
+            "id": str(u_row[0]),
+            "employee_id": u_row[1],
+            "name": u_row[2],
+            "email": u_row[3],
+            "phone": u_row[4],
+            "address": u_row[5],
+            "role": u_row[6],
+            "date_of_joining": u_row[7].strftime("%Y-%m-%d") if u_row[7] and hasattr(u_row[7], 'strftime') else str(u_row[7]) if u_row[7] else None,
+            "is_blocked": u_row[8]
+        }
+        
+        # 2. Payroll Structure
+        cursor.execute(
+            """
+            SELECT basic_salary, allowances, deductions, net_salary
+            FROM public.payroll WHERE user_id = %s;
+            """,
+            (user_id,)
+        )
+        p_row = cursor.fetchone()
+        payroll = {
+            "basic_salary": float(p_row[0]) if p_row else 0.0,
+            "allowances": float(p_row[1]) if p_row else 0.0,
+            "deductions": float(p_row[2]) if p_row else 0.0,
+            "net_salary": float(p_row[3]) if p_row else 0.0
+        }
+        
+        # 3. Attendance Logs (current calendar year)
+        current_year = datetime.now().year
+        cursor.execute(
+            """
+            SELECT date, status, check_in, check_out
+            FROM public.attendance
+            WHERE user_id = %s AND EXTRACT(YEAR FROM date) = %s
+            ORDER BY date ASC;
+            """,
+            (user_id, current_year)
+        )
+        a_rows = cursor.fetchall()
+        attendance_logs = []
+        for r in a_rows:
+            attendance_logs.append({
+                "date": r[0].strftime("%Y-%m-%d") if r[0] and hasattr(r[0], 'strftime') else str(r[0]),
+                "status": r[1],
+                "check_in": r[2].strftime("%I:%M %p") if r[2] and hasattr(r[2], 'strftime') else None,
+                "check_out": r[3].strftime("%I:%M %p") if r[3] and hasattr(r[3], 'strftime') else None
+            })
+            
+        # 4. Leaves requests (all history for this user)
+        cursor.execute(
+            """
+            SELECT id, leave_type, start_date, end_date, reason, status, admin_comment
+            FROM public.leaves
+            WHERE user_id = %s
+            ORDER BY created_at DESC;
+            """,
+            (user_id,)
+        )
+        l_rows = cursor.fetchall()
+        leaves = []
+        for r in l_rows:
+            leaves.append({
+                "id": str(r[0]),
+                "leave_type": r[1],
+                "start_date": r[2].strftime("%Y-%m-%d") if r[2] and hasattr(r[2], 'strftime') else str(r[2]),
+                "end_date": r[3].strftime("%Y-%m-%d") if r[3] and hasattr(r[3], 'strftime') else str(r[3]),
+                "reason": r[4],
+                "status": r[5],
+                "admin_comment": r[6]
+            })
+            
+        return {
+            "profile": user_profile,
+            "payroll": payroll,
+            "attendance": attendance_logs,
+            "leaves": leaves
+        }
+    finally:
+        conn.close()
