@@ -7,13 +7,69 @@ import {
 } from 'lucide-react';
 
 export default function Home() {
-  const [user, setUser] = useState<any>(null);
+  const user = JSON.parse(localStorage.getItem("user") || "{}");
+  const [currentUser, setCurrentUser] = useState<any>(user);
   const [clockInTime, setClockInTime] = useState<string | null>(null);
   const [clockOutTime, setClockOutTime] = useState<string | null>(null);
   const [status, setStatus] = useState<'NOT_CLOCKED_IN' | 'CLOCKED_IN' | 'CLOCKED_OUT'>('NOT_CLOCKED_IN');
   const [attendanceLogs, setAttendanceLogs] = useState<any[]>([]);
+  const [leaveBalance, setLeaveBalance] = useState<any>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+  const [leaveSubmitting, setLeaveSubmitting] = useState<boolean>(false);
+  const [leaveError, setLeaveError] = useState<string | null>(null);
+  const [leaveForm, setLeaveForm] = useState({
+    leave_type: 'PERSONAL',
+    start_date: '',
+    end_date: '',
+    reason: ''
+  });
 
   const navigate = useNavigate();
+
+  const loadDashboardData = async (activeUser: any = user) => {
+    if (!activeUser?.id) {
+      navigate('/login');
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const [profileData, attendanceData, _attendanceStatsData, _leavesData, leaveBalanceData] = await Promise.all([
+        api.employee.getProfile(activeUser.id),
+        api.employee.getAttendance(activeUser.id),
+        api.employee.getAttendanceStats(activeUser.id),
+        api.employee.getLeaves(activeUser.id),
+        api.employee.getLeaveBalance(activeUser.id)
+      ]);
+
+      setCurrentUser({ ...activeUser, ...profileData });
+      setAttendanceLogs(Array.isArray(attendanceData) ? attendanceData : []);
+      setLeaveBalance(leaveBalanceData || null);
+
+      const today = new Date().toISOString().slice(0, 10);
+      const todaysAttendance = Array.isArray(attendanceData)
+        ? attendanceData.find((entry: any) => entry.date === today)
+        : null;
+
+      if (todaysAttendance?.status === 'PRESENT' || todaysAttendance?.status === 'HALF_DAY') {
+        setStatus('CLOCKED_OUT');
+        setClockInTime(todaysAttendance.check_in || null);
+        setClockOutTime(todaysAttendance.check_out || null);
+      } else if (todaysAttendance?.status === 'PENDING') {
+        setStatus('CLOCKED_IN');
+      } else {
+        setStatus('NOT_CLOCKED_IN');
+      }
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Failed to load dashboard data.';
+      setError(message);
+    } finally {
+      setLoading(false);
+    }
+  };
 
   useEffect(() => {
     const sessionUser = localStorage.getItem('user');
@@ -21,16 +77,10 @@ export default function Home() {
       navigate('/login');
       return;
     }
-    
-    const parsedUser = JSON.parse(sessionUser);
-    setUser(parsedUser);
 
-    // Initialize mock logs
-    setAttendanceLogs([
-      { date: 'Yesterday', check_in: '09:00 AM', check_out: '05:00 PM', status: 'PRESENT' },
-      { date: '2 days ago', check_in: '08:55 AM', check_out: '05:05 PM', status: 'PRESENT' },
-      { date: '3 days ago', check_in: '09:02 AM', check_out: '01:00 PM', status: 'HALF_DAY' }
-    ]);
+    const parsedUser = JSON.parse(sessionUser);
+    setCurrentUser(parsedUser);
+    loadDashboardData(parsedUser);
   }, [navigate]);
 
   const handleClockIn = () => {
@@ -44,7 +94,6 @@ export default function Home() {
     setClockOutTime(now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }));
     setStatus('CLOCKED_OUT');
     
-    // Add to logs list
     setAttendanceLogs(prev => [
       { date: 'Today', check_in: clockInTime, check_out: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }), status: 'PRESENT' },
       ...prev
@@ -61,7 +110,55 @@ export default function Home() {
     }
   };
 
-  if (!user) return null;
+  const handleLeaveChange = (field: string, value: string) => {
+    setLeaveForm(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const handleLeaveSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!user?.id) {
+      navigate('/login');
+      return;
+    }
+
+    if (!leaveForm.start_date || !leaveForm.end_date || !leaveForm.reason.trim()) {
+      setLeaveError('Please complete all required leave fields.');
+      return;
+    }
+
+    setLeaveSubmitting(true);
+    setLeaveError(null);
+
+    try {
+      await api.employee.applyLeave({
+        user_id: user.id,
+        leave_type: leaveForm.leave_type,
+        start_date: leaveForm.start_date,
+        end_date: leaveForm.end_date,
+        reason: leaveForm.reason
+      });
+
+      setLeaveForm({
+        leave_type: 'PERSONAL',
+        start_date: '',
+        end_date: '',
+        reason: ''
+      });
+
+      await loadDashboardData(user);
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Leave request failed.';
+      setLeaveError(message);
+    } finally {
+      setLeaveSubmitting(false);
+    }
+  };
+
+  if (!currentUser) return null;
 
   return (
     <div className="min-h-screen bg-[#0a0b10] flex flex-col" style={{ background: 'radial-gradient(circle at bottom left, rgba(139, 92, 246, 0.05), transparent 50%)' }}>
@@ -93,27 +190,27 @@ export default function Home() {
               <User size={36} />
             </div>
             
-            <h2 className="text-xl font-bold text-white">{user.name}</h2>
+            <h2 className="text-xl font-bold text-white">{currentUser.name}</h2>
             <p className="text-xs font-mono text-purple-400 bg-purple-500/10 rounded-full px-3 py-1 inline-block mt-2 mb-6">
-              ID: {user.employee_id}
+              ID: {currentUser.employee_id}
             </p>
 
             <div className="flex flex-col gap-4 text-left border-t border-purple-900/15 pt-6 text-sm text-gray-400">
               <div className="flex items-center gap-3">
                 <Mail size={16} className="text-purple-400 shrink-0" />
-                <span className="truncate">{user.email}</span>
+                <span className="truncate">{currentUser.email}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Phone size={16} className="text-purple-400 shrink-0" />
-                <span>{user.phone || 'Not Specified'}</span>
+                <span>{currentUser.phone || 'Not Specified'}</span>
               </div>
               <div className="flex items-center gap-3">
                 <MapPin size={16} className="text-purple-400 shrink-0" />
-                <span className="truncate">{user.address || 'Not Specified'}</span>
+                <span className="truncate">{currentUser.address || 'Not Specified'}</span>
               </div>
               <div className="flex items-center gap-3">
                 <Award size={16} className="text-purple-400 shrink-0" />
-                <span>Role: {user.role}</span>
+                <span>Role: {currentUser.role}</span>
               </div>
             </div>
           </div>
@@ -155,6 +252,14 @@ export default function Home() {
               <Clock size={18} className="text-purple-400" />
               Shift Attendance
             </h3>
+
+            {loading && (
+              <p className="text-sm text-gray-400 mb-4">Loading attendance data...</p>
+            )}
+
+            {error && (
+              <p className="text-sm text-red-400 mb-4">{error}</p>
+            )}
 
             <div className="flex flex-col sm:flex-row items-center justify-between gap-6 p-6 bg-[#0f1016] border border-white/5 rounded-xl mb-6">
               <div>
@@ -230,26 +335,71 @@ export default function Home() {
               <Calendar size={18} className="text-purple-400" />
               Apply for Leave
             </h3>
+
+            {leaveBalance && (
+              <p className="text-xs text-gray-400 mb-4">
+                Remaining leave balance: <span className="text-purple-400 font-bold">{leaveBalance.remaining_leave_balance}</span> / {leaveBalance.annual_leave_days} days
+              </p>
+            )}
+
+            {leaveError && (
+              <p className="text-sm text-red-400 mb-4">{leaveError}</p>
+            )}
             
-            <form onSubmit={e => { e.preventDefault(); alert("Leave request submitted successfully!"); }} className="flex flex-col gap-4">
+            <form onSubmit={handleLeaveSubmit} className="flex flex-col gap-4">
               <div className="grid-2">
                 <div className="form-group">
+                  <label className="form-label" htmlFor="leave-type">Leave Type</label>
+                  <select
+                    id="leave-type"
+                    className="form-input"
+                    value={leaveForm.leave_type}
+                    onChange={(e) => handleLeaveChange('leave_type', e.target.value)}
+                  >
+                    <option value="PERSONAL">Personal</option>
+                    <option value="SICK">Sick</option>
+                    <option value="ANNUAL">Annual</option>
+                    <option value="EMERGENCY">Emergency</option>
+                  </select>
+                </div>
+                <div className="form-group">
                   <label className="form-label" htmlFor="leave-start">Start Date *</label>
-                  <input id="leave-start" type="date" className="form-input" required />
+                  <input
+                    id="leave-start"
+                    type="date"
+                    className="form-input"
+                    value={leaveForm.start_date}
+                    onChange={(e) => handleLeaveChange('start_date', e.target.value)}
+                    required
+                  />
                 </div>
                 <div className="form-group">
                   <label className="form-label" htmlFor="leave-end">End Date *</label>
-                  <input id="leave-end" type="date" className="form-input" required />
+                  <input
+                    id="leave-end"
+                    type="date"
+                    className="form-input"
+                    value={leaveForm.end_date}
+                    onChange={(e) => handleLeaveChange('end_date', e.target.value)}
+                    required
+                  />
                 </div>
               </div>
 
               <div className="form-group">
                 <label className="form-label" htmlFor="leave-reason">Reason *</label>
-                <textarea id="leave-reason" className="form-input min-h-[60px]" placeholder="Brief explanation of your leave..." required />
+                <textarea
+                  id="leave-reason"
+                  className="form-input min-h-[60px]"
+                  placeholder="Brief explanation of your leave..."
+                  value={leaveForm.reason}
+                  onChange={(e) => handleLeaveChange('reason', e.target.value)}
+                  required
+                />
               </div>
 
-              <button type="submit" className="btn btn-primary self-end py-2 px-6 text-sm font-semibold">
-                Submit Request
+              <button type="submit" className="btn btn-primary self-end py-2 px-6 text-sm font-semibold" disabled={leaveSubmitting}>
+                {leaveSubmitting ? 'Submitting...' : 'Submit Request'}
               </button>
             </form>
           </div>

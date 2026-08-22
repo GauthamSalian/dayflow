@@ -117,5 +117,35 @@ export const api = {
       
     getEmployeeProfileDetail: (user_id: string) =>
       apiFetch(`/admin/employees/profile/${user_id}`)
+  },
+
+  // Employee endpoints
+  employee: {
+    getProfile: (user_id: string) =>
+      apiFetch(`/employee/profile/${user_id}`),
+
+    getAttendance: (user_id: string) =>
+      apiFetch(`/employee/attendance/${user_id}`),
+
+    getAttendanceStats: (user_id: string) =>
+      apiFetch(`/employee/attendance/stats/${user_id}`),
+
+    getLeaves: (user_id: string) =>
+      apiFetch(`/employee/leaves/${user_id}`),
+
+    getLeaveBalance: (user_id: string) =>
+      apiFetch(`/employee/leave/balance/${user_id}`),
+
+    applyLeave: (data: {
+      user_id: string;
+      leave_type: string;
+      start_date: string;
+      end_date: string;
+      reason?: string;
+    }) =>
+      apiFetch("/employee/leave/apply", {
+        method: "POST",
+        body: JSON.stringify(data)
+      })
   }
 };
