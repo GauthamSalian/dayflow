@@ -23,9 +23,11 @@ app.add_middleware(
 
 # Import routes
 from api import adminroutes
+from api import authroutes
 
 # Mount routes
 app.include_router(adminroutes.router, prefix="/api")
+app.include_router(authroutes.router, prefix="/api")
 
 @app.get("/")
 def read_root():
