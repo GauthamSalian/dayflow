@@ -2,6 +2,7 @@ import os
 import sys
 import uuid
 import bcrypt
+import json
 from datetime import datetime
 from services.db import get_db_connection
 
@@ -150,6 +151,10 @@ def add_new_employee(name: str, email: str, phone: str, date_of_joining: str, sa
         if cursor.fetchone():
             raise ValueError(f"An account with email '{email}' already exists.")
             
+        cursor.execute("SELECT id FROM public.users WHERE email = %s", (email,))
+        if cursor.fetchone():
+            raise ValueError(f"An account with email '{email}' already exists.")
+            
         # Generate credentials
         login_id = generate_login_id(name, date_of_joining)
         password = login_id # password same as login id initially
@@ -158,7 +163,15 @@ def add_new_employee(name: str, email: str, phone: str, date_of_joining: str, sa
         hashed_pwd = hash_password(password)
         
         # Metadata for the trigger
-        raw_user_meta_data = f'{{"name": "{name}", "role": "EMPLOYEE", "employee_id": "{login_id}", "phone": "{phone}", "address": "{address}", "password": "{password}"}}'
+        raw_user_meta_data_dict = {
+            "name": name,
+            "role": "EMPLOYEE",
+            "employee_id": login_id,
+            "phone": phone,
+            "address": address,
+            "password": password
+        }
+        raw_user_meta_data = json.dumps(raw_user_meta_data_dict)
         
         # 1. Insert into auth.users
         insert_auth_sql = """
