@@ -442,7 +442,8 @@ h1, h2, h3, h4, h5, h6 {
 .bg-red-500\/5 { background-color: rgba(239, 68, 68, 0.05); }
 .bg-white\/5 { background-color: rgba(255, 255, 255, 0.05); }
 .border-white\/5 { border-color: rgba(255, 255, 255, 0.05); }
-.border-white\/10 { border-color: rgba(255, 255, 255, 0.1); }
+.bg-emerald-500 { background-color: #10b981 !important; }
+.bg-red-500 { background-color: #ef4444 !important; }
 
 /* Typography Utilities */
 .text-center { text-align: center; }
